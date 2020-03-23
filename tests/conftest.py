@@ -3,28 +3,45 @@ import tempfile
 
 import pytest
 from clownbot import create_app
-from clownbot.db import get_db, init_db
+from clownbot.database.db import db
+from clownbot.database.models import User, Post
 
-with open(os.path.join(os.path.dirname(__file__), 'data.sql'), 'rb') as f:
-    _data_sql = f.read().decode('utf8')
+from werkzeug.security import generate_password_hash
+from mongoengine import connect
 
 @pytest.fixture
 def app():
-    db_fd, db_path = tempfile.mkstemp()
 
-    app = create_app({
-        'TESTING': True,
-        'DATABASE': db_path,
-    })
+    app = create_app('testing')
 
     with app.app_context():
-        init_db()
-        get_db().executescript(_data_sql)
+
+        user = User(
+            username='testniqquh',
+            email='testniqquh@testsite.dom',
+            password=generate_password_hash('testpass')
+        ).save()
+        user2 = User(
+            username='champ',
+            email='champ@test.dev',
+            password=generate_password_hash('sampion')
+        ).save()
+
+        post = Post(
+            title='hello helloo',
+            body='I really think I still messed up, I can never be perfect',
+            author=user
+        ).save()
+        post2 = Post(
+            title='Nataka kuongea na riddy',
+            body='Tafadhali Kaka, kwangu hii ni wrong number',
+            author=user2
+        ).save()
 
     yield app
 
-    os.close(db_fd)
-    os.unlink(db_path)
+    db_c = connect('test_clownbot')
+    db_c.drop_database('test_clownbot') #see how to improve on this one
 
 @pytest.fixture
 def client(app):
@@ -38,7 +55,7 @@ class AuthActions(object):
     def __init__(self, client):
         self._client = client
 
-    def login(self, username='test', password='test'):
+    def login(self, username='testniqquh', password='testpass'):
         return self._client.post(
             '/auth/login',
             data={'username': username, 'password': password}
@@ -51,3 +68,9 @@ class AuthActions(object):
 @pytest.fixture
 def auth(client):
     return AuthActions(client)
+
+@pytest.fixture
+def blog_id(app):
+    with app.app_context():
+        post = Post.objects(title='hello helloo').first()
+    return post.id

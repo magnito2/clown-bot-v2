@@ -4,35 +4,18 @@ from flask import (
 from werkzeug.exceptions import abort
 
 from .auth import login_required
-from .database.models import Post, User
+from .database.models import Bot, User
 
-bp = Blueprint('blog', __name__)
+bp = Blueprint('bot', __name__)
 
-def get_post(id, check_author=True):
-    post = Post.objects(id=id).first()
-
-    if post is None:
-        abort(404, "Post id {0} doesn't exist.".format(id))
-    if check_author and post.author.id != g.user['id']:
-        abort(403)
-
-    return post
+def get_bot():
+    return Bot.objects(owner.id=g.user['id']).first()
 
 @bp.route('/')
+@login_required
 def index():
-    posts = []
-    for post in Post.objects:
-        p = {
-            'id' : str(post.id),
-            'title' : post.title,
-            'body'  : post.body,
-            'author_id' : post.author.id,
-            'username' : post.author.username,
-            'created' : post.created
-            }
-        posts.append(p)
-
-    return render_template('blog/index.html', posts=posts)
+    bot = get_bot()
+    return render_template('bot/index.html', bot=bot)
 
 @bp.route('/create', methods=('GET', 'POST'))
 @login_required
@@ -61,7 +44,11 @@ def create():
 @bp.route('/<string:id>/update', methods=('GET', 'POST'))
 @login_required
 def update(id):
-    post = get_post(id)
+    post = Post.objects(id=id).first()
+
+    if post is None:
+        error = "Post not found"
+        flash(error)
 
     if request.method == 'POST':
         title = request.form['title']
@@ -93,7 +80,5 @@ def update(id):
 @bp.route('/<string:id>/delete', methods=('POST',))
 @login_required
 def delete(id):
-    post = get_post(id)
-
     Post.objects(id=id).first().delete()
     return redirect(url_for('blog.index'))
